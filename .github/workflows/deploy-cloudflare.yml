@@ -21,16 +21,17 @@ jobs:
       - name: Install dependencies
         run: |
           npm install -g yarn
-          yarn install --frozen-lockfile || yarn install
+          yarn install --network-timeout 600000 || yarn install
       
-      - name: Build
-        run: npm run build
+      - name: Build static export
+        run: yarn export
         env:
-          BUILD_MODE: standalone
+          BUILD_MODE: export
+          BUILD_APP: "1"
       
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: \${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy .next --project-name=lingxi-ai --branch=main
+          command: pages deploy out --project-name=lingxi-ai --branch=main
