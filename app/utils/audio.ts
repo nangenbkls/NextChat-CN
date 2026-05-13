@@ -1,45 +1,51 @@
-type TTSPlayer = {
-  init: () => void;
-  play: (audioBuffer: ArrayBuffer, onended: () => void | null) => Promise<void>;
+import { createSpeechPlayer } from "@/app/utils/ms_edge_tts";
+import { createTTSPlayer } from "@/app/utils/ms_edge_tts";
+
+export interface TTSPlayer {
+  type: "edge" | "web";
+  play: (text: string) => void;
   stop: () => void;
-};
+  speaking: boolean;
+}
 
-export function createTTSPlayer(): TTSPlayer {
-  let audioContext: AudioContext | null = null;
-  let audioBufferSourceNode: AudioBufferSourceNode | null = null;
-
-  const init = () => {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    audioContext.suspend();
+function edgePlayer(): TTSPlayer {
+  const player = createTTSPlayer(createSpeechPlayer);
+  return {
+    type: "edge",
+    play: (text: string) => player?.play(text),
+    stop: () => player?.stop(),
+    speaking: player?.speaking ?? false,
   };
+}
 
-  const play = async (audioBuffer: ArrayBuffer, onended: () => void | null) => {
-    if (audioBufferSourceNode) {
-      audioBufferSourceNode.stop();
-      audioBufferSourceNode.disconnect();
-    }
+function webPlayer(): TTSPlayer {
+  const utteranceRef = { current: null as SpeechSynthesisUtterance | null };
+  const speakingRef = { current: false };
 
-    const buffer = await audioContext!.decodeAudioData(audioBuffer);
-    audioBufferSourceNode = audioContext!.createBufferSource();
-    audioBufferSourceNode.buffer = buffer;
-    audioBufferSourceNode.connect(audioContext!.destination);
-    audioContext!.resume().then(() => {
-      audioBufferSourceNode!.start();
-    });
-    audioBufferSourceNode.onended = onended;
+  return {
+    type: "web",
+    play: (text: string) => {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.onstart = () => (speakingRef.current = true);
+      utterance.onend = () => (speakingRef.current = false);
+      utteranceRef.current = utterance;
+      window.speechSynthesis.speak(utterance);
+    },
+    stop: () => {
+      window.speechSynthesis.cancel();
+      speakingRef.current = false;
+    },
+    get speaking() {
+      return speakingRef.current;
+    },
   };
+}
 
-  const stop = () => {
-    if (audioBufferSourceNode) {
-      audioBufferSourceNode.stop();
-      audioBufferSourceNode.disconnect();
-      audioBufferSourceNode = null;
-    }
-    if (audioContext) {
-      audioContext.close();
-      audioContext = null;
-    }
-  };
+let ttsPlayer: TTSPlayer | null = null;
 
-  return { init, play, stop };
+export function createTTSPlayer(type: "edge" | "web" = "edge"): TTSPlayer {
+  if (ttsPlayer) return ttsPlayer;
+  ttsPlayer = type === "edge" ? edgePlayer() : webPlayer();
+  return ttsPlayer;
 }
