@@ -14,7 +14,7 @@ export class MCPClientLogger {
   private readonly debugMode: boolean;
 
   constructor(
-    prefix: string = "灵犀AI MCP Client",
+    prefix: string = "NextChat MCP Client",
     debugMode: boolean = false,
   ) {
     this.prefix = prefix;
